@@ -1,14 +1,18 @@
 ---
-- include: setup-RedHat.yml
+- include_tasks: setup-RedHat.yml
   when: ansible_os_family == 'RedHat'
 
-- include: setup-Debian.yml
+- include_tasks: setup-Debian.yml
   when: ansible_os_family == 'Debian'
 
 - name: Install Elasticsearch Curator and required dependencies.
+  pip:
+    name: elasticsearch-curator
+    version: "{{ elasticsearch_curator_version }}"
+
+- name: Install Elasticsearch Curator required dependencies.
   pip: "name={{ item }}"
   with_items:
-    - elasticsearch-curator
     - argparse
 
 - name: Configure cron jobs for Elasticsearch Curator.
