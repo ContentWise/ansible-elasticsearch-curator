@@ -1,27 +1,51 @@
 ---
-- include_tasks: setup-RedHat.yml
+- name: Ensure pip is installed.
+  yum: name=python-pip state=installed enablerepo=epel
   when: ansible_os_family == 'RedHat'
 
-- include_tasks: setup-Debian.yml
+- name: Ensure pip is installed.
+  apt: name=python-pip state=installed
   when: ansible_os_family == 'Debian'
 
-- name: Install Elasticsearch Curator and required dependencies.
-  pip:
+# Install elasticsearch-curator python package
+- name: Install elasticsearch-curator
+  pip: 
     name: elasticsearch-curator
     version: "{{ elasticsearch_curator_version }}"
+    state: present
 
-- name: Install Elasticsearch Curator required dependencies.
-  pip: "name={{ item }}"
-  with_items:
-    - argparse
+# Configuration files
+- name: Create elasticsearch-curator config dir
+  file:
+    path:  "{{ elasticsearch_curator_conf_dir }}"
+    state: directory
 
-- name: Configure cron jobs for Elasticsearch Curator.
+- name: Create elasticsearch-curator config file
+  template:
+    src:   curator.yml.j2
+    dest:  "{{ elasticsearch_curator_conf_dir }}/curator.yml"
+    owner: root
+    group: root
+    mode:  0644
+
+- name: Create elasticsearch-curator actions config file
+  template:
+    src:   actions.yml.j2
+    dest:  "{{ elasticsearch_curator_conf_dir }}/actions.yml"
+    owner: root
+    group: root
+    mode:  0644
+
+# Cron jobs
+- name: Create cron job for elasticsearch-curator
   cron:
-    name: "{{ item.name }}"
-    job: "{{ item.job }}"
-    minute: "{{ item.minute | default('*') }}"
-    hour: "{{ item.hour | default('*') }}"
-    day: "{{ item.day | default('*') }}"
-    weekday: "{{ item.weekday | default('*') }}"
-    month: "{{ item.month | default('*') }}"
-  with_items: "{{ elasticsearch_curator_cron_jobs }}"
+    name:    "{{ elasticsearch_curator_cron_job.description|default('Curate Elasticsearch Indices') }}"
+    minute:  "{{ elasticsearch_curator_cron_job.minute|default('*') }}"
+    hour:    "{{ elasticsearch_curator_cron_job.hour|default('*') }}"
+    day:     "{{ elasticsearch_curator_cron_job.day|default('*') }}"
+    weekday: "{{ elasticsearch_curator_cron_job.weekday|default('*') }}"
+    month:   "{{ elasticsearch_curator_cron_job.month|default('*') }}"
+    user:    "{{ elasticsearch_curator_cron_job.user|default('root') }}"
+    job:     "/usr/local/bin/curator --config {{ elasticsearch_curator_conf_dir }}/curator.yml {{ elasticsearch_curator_conf_dir }}/actions.yml"
+    cron_file: elasticsearch-curator
+  when: elasticsearch_curator_cron_job
